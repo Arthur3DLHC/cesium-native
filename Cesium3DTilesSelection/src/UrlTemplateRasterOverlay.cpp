@@ -1,7 +1,7 @@
 #include "Cesium3DTilesSelection/CreditSystem.h"
 #include "Cesium3DTilesSelection/QuadtreeRasterOverlayTileProvider.h"
 #include "Cesium3DTilesSelection/RasterOverlayTile.h"
-#include "Cesium3DTilesSelection/UrlTemplateTileMapRasterOverlay.h"
+#include "Cesium3DTilesSelection/UrlTemplateRasterOverlay.h"
 #include "Cesium3DTilesSelection/TilesetExternals.h"
 #include "Cesium3DTilesSelection/spdlog-cesium.h"
 #include "Cesium3DTilesSelection/tinyxml-cesium.h"
@@ -114,18 +114,18 @@ private:
 	int32_t _levelBias;
 };
 
-UrlTemplateTileMapRasterOverlay::UrlTemplateTileMapRasterOverlay(
+UrlTemplateRasterOverlay::UrlTemplateRasterOverlay(
     const std::string& name,
     const std::string& url,
     const std::vector<IAssetAccessor::THeader>& headers,
-    const UrlTemplateTileMapRasterOverlayOptions& tmsOptions,
+    const UrlTemplateRasterOverlayOptions& tmsOptions,
     const RasterOverlayOptions& overlayOptions)
     : RasterOverlay(name, overlayOptions),
       _url(url),
       _headers(headers),
       _options(tmsOptions) {}
 
-UrlTemplateTileMapRasterOverlay::~UrlTemplateTileMapRasterOverlay() {}
+UrlTemplateRasterOverlay::~UrlTemplateRasterOverlay() {}
 
 /*
 static std::optional<std::string> getAttributeString(
@@ -165,7 +165,7 @@ static std::optional<double> getAttributeDouble(
 */
 
 Future<RasterOverlay::CreateTileProviderResult>
-UrlTemplateTileMapRasterOverlay::createTileProvider(
+UrlTemplateRasterOverlay::createTileProvider(
     const CesiumAsync::AsyncSystem& asyncSystem,
     const std::shared_ptr<CesiumAsync::IAssetAccessor>& pAssetAccessor,
     const std::shared_ptr<CreditSystem>& pCreditSystem,

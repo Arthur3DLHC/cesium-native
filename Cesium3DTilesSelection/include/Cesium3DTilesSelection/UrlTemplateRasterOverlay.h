@@ -19,7 +19,7 @@ class CreditSystem;
 /**
  * @brief Options for web map tile service accesses.
  */
-struct UrlTemplateTileMapRasterOverlayOptions {
+struct UrlTemplateRasterOverlayOptions {
 
   /**
    * @brief A credit for the data source, which is displayed on the canvas.
@@ -97,7 +97,7 @@ struct UrlTemplateTileMapRasterOverlayOptions {
 /**
  * @brief A {@link RasterOverlay} based on web map tile service imagery.
  */
-class CESIUM3DTILESSELECTION_API UrlTemplateTileMapRasterOverlay final
+class CESIUM3DTILESSELECTION_API UrlTemplateRasterOverlay final
     : public RasterOverlay {
 public:
   /**
@@ -110,13 +110,13 @@ public:
    * @param tmsOptions The {@link UrlTemplateTileMapRasterOverlayOptions}.
    * @param overlayOptions The {@link RasterOverlayOptions} for this instance.
    */
-  UrlTemplateTileMapRasterOverlay(
+  UrlTemplateRasterOverlay(
       const std::string& name,
       const std::string& url,
       const std::vector<CesiumAsync::IAssetAccessor::THeader>& headers = {},
-      const UrlTemplateTileMapRasterOverlayOptions& tmsOptions = {},
+      const UrlTemplateRasterOverlayOptions& tmsOptions = {},
       const RasterOverlayOptions& overlayOptions = {});
-  virtual ~UrlTemplateTileMapRasterOverlay() override;
+  virtual ~UrlTemplateRasterOverlay() override;
 
   virtual CesiumAsync::Future<CreateTileProviderResult>
   createTileProvider(
@@ -131,7 +131,7 @@ public:
 private:
   std::string _url;
   std::vector<CesiumAsync::IAssetAccessor::THeader> _headers;
-  UrlTemplateTileMapRasterOverlayOptions _options;
+  UrlTemplateRasterOverlayOptions _options;
 	std::string _fileExtension;
 };
 
