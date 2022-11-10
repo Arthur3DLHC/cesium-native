@@ -72,6 +72,8 @@ protected:
   virtual CesiumAsync::Future<LoadedRasterOverlayImage> loadQuadtreeTileImage(
       const CesiumGeometry::QuadtreeTileID& tileID) const override {
 
+    // TODO: 参考 BingMapsRasterOverlay 支持 subdomain 通配符
+    // TODO: 支持指定通配符的补零宽度
     // 判断是否需要将 y 轴取反
 		// 此时不要加 level bias
 		uint32_t y = tileID.y;
