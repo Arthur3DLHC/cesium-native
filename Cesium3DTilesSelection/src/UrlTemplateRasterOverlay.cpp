@@ -37,15 +37,17 @@ public:
       const CesiumGeospatial::Projection& projection,
       const CesiumGeometry::QuadtreeTilingScheme& tilingScheme,
       const CesiumGeometry::Rectangle& coverageRectangle,
-      const std::string& url,
+      const std::string& urlTemplate,
       const std::vector<IAssetAccessor::THeader>& headers,
       const std::string& fileExtension,
       uint32_t width,
       uint32_t height,
       uint32_t minimumLevel,
       uint32_t maximumLevel,
-			int32_t levelBias,
-			bool flipY)
+      int32_t levelBias,
+      // bool flipY,
+      const std::vector<std::string>& subdomains,
+      const std::map<std::string, std::string>& urlSchemeZeroPadding)
       : QuadtreeRasterOverlayTileProvider(
             owner,
             asyncSystem,
@@ -60,15 +62,33 @@ public:
             maximumLevel,
             width,
             height),
-        _url(url),
+        _urlTemplate(urlTemplate),
         _headers(headers),
         _fileExtension(fileExtension),
-				_flipY(flipY),
-				_levelBias(levelBias){}
+        // _flipY(flipY),
+        _levelBias(levelBias),
+        _subdomains(subdomains),
+        _urlSchemeZeroPadding(urlSchemeZeroPadding) {}
 
   virtual ~UrlTemplateTileProvider() {}
 
 protected:
+
+  std::string padWithZerosIfNecessary(const std::string& key, uint32_t value) const
+  {
+    auto ret = std::to_string(value);
+    // 判断是否指定了 key 的补零模板
+    auto paddingTemplate = _urlSchemeZeroPadding.find(key);
+    if (paddingTemplate != _urlSchemeZeroPadding.end()) {
+      size_t templateWidth = paddingTemplate->second.length();
+      if (templateWidth > ret.length()) {
+        // 在字符串前面补零
+        ret = std::string(templateWidth - ret.length(), '0') + ret;
+      }
+    }
+    return ret;
+  }
+
   virtual CesiumAsync::Future<LoadedRasterOverlayImage> loadQuadtreeTileImage(
       const CesiumGeometry::QuadtreeTileID& tileID) const override {
 
@@ -76,11 +96,57 @@ protected:
     // TODO: 支持指定通配符的补零宽度
     // 判断是否需要将 y 轴取反
 		// 此时不要加 level bias
-		uint32_t y = tileID.y;
-		if (_flipY) y = (1 << tileID.level) - 1 - tileID.y;
+    //uint32_t y = tileID.y;
+    //if (_flipY)
+    //  y = (1 << tileID.level) - 1 - tileID.y;
+
+    // TODO: 改用 CesiumUtility::Uri::substituteTemplateParameters() 函数替换
+    // url
+    std::string url = CesiumUtility::Uri::substituteTemplateParameters(
+        this->_urlTemplate,
+        [this, &tileID](const std::string& key) {
+          if (key == "x") {
+            return padWithZerosIfNecessary(key, tileID.x);
+          } else if (key == "y") {
+            return padWithZerosIfNecessary(key, tileID.y);
+          } else if (key == "z") {
+            return padWithZerosIfNecessary(key, tileID.level);
+          } else if (key == "reverseX") {
+            auto reverseX =
+                getTilingScheme().getNumberOfXTilesAtLevel(tileID.level) -
+                tileID.x - 1;
+            return padWithZerosIfNecessary(key, reverseX);
+          } else if (key == "reverseY") {
+            auto reverseY =
+                getTilingScheme().getNumberOfYTilesAtLevel(tileID.level) -
+                tileID.y - 1;
+            return padWithZerosIfNecessary(key, reverseY);
+          } else if (key == "reverseZ") {
+            auto maximumLevel = getMaximumLevel();
+            auto reverseZ = tileID.level < maximumLevel
+                                ? maximumLevel - tileID.level - 1
+                                : tileID.level;
+            return padWithZerosIfNecessary(key, reverseZ);
+          } else if (key == "s") {
+            // 如果指定了{s}模板参数，则 subdomains 数组中必须有元素
+            assert(_subdomains.size() > 0);
+            const size_t subdomainIndex =
+                (tileID.level + tileID.x + tileID.y) % _subdomains.size();
+            return _subdomains[subdomainIndex];
+          } else if (key == "width") {
+            return std::to_string(getWidth());
+          } else if (key == "height") {
+            return std::to_string(getHeight());
+          }
+          else {
+            return key;
+          }
+          // TODO: 支持 CesiumJS UtlTemplateImageryProvider 其他参数模板
+          // 参考 Source\Scene\UrlTemplateImageryProvider.js
+        });
 
 		// 替换 _url 中的 {x}, {y}, {z} 字符串
-
+        /*
 		std::string url = this->_url;
 		size_t found = std::string::npos;
 		if((found = url.find("{x}")) != std::string::npos){
@@ -92,15 +158,8 @@ protected:
 		if((found = url.find("{z}")) != std::string::npos) {
 			url.replace(found, 3, std::to_string(tileID.level + _levelBias));
 		}
-
+        */
 		// OutputDebugString(url.c_str());
-
-	  //std::string url = CesiumUtility::Uri::resolve(
-   //     this->_url,
-   //     "WMTS/tile/1.0.0/Pub_BaseMapEng_LightGray_WM/default/GoogleMapsCompatible/" +
-   //     std::to_string(tileID.level) + "/" + std::to_string(y) + "/" + std::to_string(tileID.x) + ".jpg",
-   //     true);
-
 
     LoadTileImageFromUrlOptions options;
     options.rectangle = this->getTilingScheme().tileToRectangle(tileID);
@@ -109,11 +168,13 @@ protected:
   }
 
 private:
-  std::string _url;
+  std::string _urlTemplate;
   std::vector<IAssetAccessor::THeader> _headers;
   std::string _fileExtension;
-	bool _flipY;
-	int32_t _levelBias;
+  // bool _flipY;
+  int32_t _levelBias;
+  std::vector<std::string> _subdomains;
+  std::map<std::string, std::string> _urlSchemeZeroPadding;
 };
 
 UrlTemplateRasterOverlay::UrlTemplateRasterOverlay(
@@ -242,7 +303,7 @@ UrlTemplateRasterOverlay::createTileProvider(
 	uint32_t maximumLevel = _options.maximumLevel.value_or(25);
 	int32_t levelBias = _options.levelBias.value_or(0);
 
-	bool flipY = _options.flipY.value_or(false);
+	// bool flipY = _options.flipY.value_or(false);
 
 	// 不用等待远程访问，直接生成一个已经 Resolve 的 Future。参见 RasterizedPolygonsOverlay.cpp
         return asyncSystem.createResolvedFuture<CreateTileProviderResult>(
@@ -265,7 +326,9 @@ UrlTemplateRasterOverlay::createTileProvider(
                     minimumLevel,
                     maximumLevel,
                     levelBias,
-                    flipY)));
+                    // flipY,
+                    _options.subdomains,
+                  _options.urlSchemeZeroPadding)));
 }
 
 } // namespace Cesium3DTilesSelection

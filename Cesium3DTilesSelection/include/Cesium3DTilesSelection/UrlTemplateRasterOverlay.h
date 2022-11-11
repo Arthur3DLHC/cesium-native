@@ -31,6 +31,11 @@ struct UrlTemplateRasterOverlayOptions {
 	 */
 	std::optional<std::string> urlTemplate;
 
+  /*
+  * @brief URL scheme zero padding for each tile coordinate.
+  */
+  std::map<std::string, std::string> urlSchemeZeroPadding;
+
 	/*
 	 * @brief The level bias. The {z} in url template will be replaced by the tile original level + levelBias
 	 */
@@ -91,7 +96,12 @@ struct UrlTemplateRasterOverlayOptions {
   /**
    * @brief An otion to flip the y values of a tile map resource.
    */
-  std::optional<bool> flipY;
+  // std::optional<bool> flipY;
+
+  /**
+  * @bried The subdomains to use for the {s} placeholder in the URL template. 
+  */
+  std::vector<std::string> subdomains;
 };
 
 /**
