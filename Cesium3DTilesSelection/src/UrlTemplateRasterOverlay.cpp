@@ -102,6 +102,9 @@ protected:
 
     // TODO: 改用 CesiumUtility::Uri::substituteTemplateParameters() 函数替换
     // url
+
+    // uint32_t level = (uint32_t)std::max(0, (int)tileID.level + _levelBias);
+
     std::string url = CesiumUtility::Uri::substituteTemplateParameters(
         this->_urlTemplate,
         [this, &tileID](const std::string& key) {
@@ -110,13 +113,15 @@ protected:
           } else if (key == "y") {
             return padWithZerosIfNecessary(key, tileID.y);
           } else if (key == "z") {
-            return padWithZerosIfNecessary(key, tileID.level);
+            return padWithZerosIfNecessary(key, tileID.level + _levelBias);
           } else if (key == "reverseX") {
+            // fix me: 这里应该用原始 level 还是加了偏移的 level？
             auto reverseX =
                 getTilingScheme().getNumberOfXTilesAtLevel(tileID.level) -
                 tileID.x - 1;
             return padWithZerosIfNecessary(key, reverseX);
           } else if (key == "reverseY") {
+            // fix me: 这里应该用原始 level 还是加了偏移的 level？
             auto reverseY =
                 getTilingScheme().getNumberOfYTilesAtLevel(tileID.level) -
                 tileID.y - 1;
@@ -126,7 +131,7 @@ protected:
             auto reverseZ = tileID.level < maximumLevel
                                 ? maximumLevel - tileID.level - 1
                                 : tileID.level;
-            return padWithZerosIfNecessary(key, reverseZ);
+            return padWithZerosIfNecessary(key, reverseZ + _levelBias);
           } else if (key == "s") {
             // 如果指定了{s}模板参数，则 subdomains 数组中必须有元素
             assert(_subdomains.size() > 0);
