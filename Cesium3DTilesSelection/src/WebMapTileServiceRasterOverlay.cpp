@@ -35,7 +35,7 @@ public:
       const CesiumGeometry::QuadtreeTilingScheme& tilingScheme,
       const CesiumGeometry::Rectangle& coverageRectangle,
       const std::string& url,
-			const std::string& version,
+      const std::string& version,
       const std::vector<IAssetAccessor::THeader>& headers,
       const std::string& layer,
       const std::string& style,
@@ -62,14 +62,14 @@ public:
             width,
             height),
         _url(url),
-				_version(version),
+        _version(version),
         _headers(headers),
-				_layer(layer),
-				_style(style),
-				_tileMatrixSet(tileMatrixSet),
-				_format(format),
+        _layer(layer),
+        _style(style),
+        _tileMatrixSet(tileMatrixSet),
+        _format(format),
         _tokenName(tokenName),
-				_tokenValue(tokenValue){}
+        _tokenValue(tokenValue) {}
 
   virtual ~WebMapTileServiceTileProvider() {}
 
@@ -77,32 +77,34 @@ protected:
   virtual CesiumAsync::Future<LoadedRasterOverlayImage> loadQuadtreeTileImage(
       const CesiumGeometry::QuadtreeTileID& tileID) const override {
 
-		// 经纬度投影下的 tileID 需要特殊处理
-		uint32_t level = tileID.level;
-		if(this->getProjection().index() == 0)
-		{
-			level++;
-		}
+    // 经纬度投影下的 tileID 需要特殊处理
+    uint32_t level = tileID.level;
+    if (this->getProjection().index() == 0) {
+      level++;
+    }
 
     // WMTS 需要将 y 轴取反
     uint32_t y = (1 << tileID.level) - 1 - tileID.y;
 
-		// 拼接参数
+    // 拼接参数
 
+    std::string requestParams =
+        "?service=wmts&request=gettile&version=" + _version +
+        "&layer=" + _layer + "&style=" + _style +
+        "&tilematrixset=" + _tileMatrixSet + "&format=" + _format +
+        "&tilematrix=" + std::to_string(level) +
+        "&tilerow=" + std::to_string(y) +
+        "&tilecol=" + std::to_string(tileID.x);
 
-		std::string requestParams = "?service=wmts&request=gettile&version=" + _version
-			+ "&layer=" + _layer + "&style=" + _style
-			+ "&tilematrixset=" + _tileMatrixSet + "&format=" + _format
-			+ "&tilematrix=" + std::to_string(level) + "&tilerow=" + std::to_string(y) + "&tilecol=" + std::to_string(tileID.x);
+    if (!_tokenName.empty() && !_tokenValue.empty()) {
+      requestParams = requestParams + "&" + _tokenName + "=" + _tokenValue;
+    }
 
-		if (!_tokenName.empty() && !_tokenValue.empty()) {
-			requestParams = requestParams + "&" + _tokenName + "=" + _tokenValue;
-		}
+    // TODO: 改为将 url 字符串视为模板？与 Cesium JS 保持一致
+    // TODO: 支持 subdomains
 
-    std::string url = CesiumUtility::Uri::resolve(
-        this->_url,
-				requestParams,
-        true);
+    std::string url =
+        CesiumUtility::Uri::resolve(this->_url, requestParams, true);
 
 		// 调试
 		//std::string tk = "9084ac98a18afab0293b5ce547b0fcac";
@@ -134,14 +136,14 @@ protected:
 
 private:
   std::string _url;
-	std::string _version;
+  std::string _version;
   std::vector<IAssetAccessor::THeader> _headers;
-	std::string _layer;
-	std::string _style;
-	std::string _tileMatrixSet;
+  std::string _layer;
+  std::string _style;
+  std::string _tileMatrixSet;
   std::string _format;
-	std::string _tokenName;
-	std::string _tokenValue;
+  std::string _tokenName;
+  std::string _tokenValue;
 };
 
 WebMapTileServiceRasterOverlay::WebMapTileServiceRasterOverlay(
@@ -179,7 +181,7 @@ Future<RasterOverlay::CreateTileProviderResult>
 
   return pAssetAccessor->get(asyncSystem, xmlUrl, this->_headers)
       .thenInWorkerThread(
-        [pOwner,
+          [pOwner,
            asyncSystem,
            pAssetAccessor,
            credit,
@@ -193,68 +195,82 @@ Future<RasterOverlay::CreateTileProviderResult>
             const IAssetResponse* pResponse = pRequest->response();
             if (!pResponse) {
               return nonstd::make_unexpected(RasterOverlayLoadFailureDetails{
-                RasterOverlayLoadType::TileProvider,
-                std::move(pRequest),
-                  "No response received from Tile Map Service."
-                });
+                  RasterOverlayLoadType::TileProvider,
+                  std::move(pRequest),
+                  "No response received from Tile Map Service."});
             }
 
-						// 默认使用经纬度投影？
-            CesiumGeospatial::Projection projection = CesiumGeospatial::GeographicProjection();
-            // CesiumGeospatial::Projection projection = CesiumGeospatial::WebMercatorProjection();
+            // 默认使用经纬度投影？
+            CesiumGeospatial::Projection projection =
+                CesiumGeospatial::GeographicProjection();
+            // CesiumGeospatial::Projection projection =
+            // CesiumGeospatial::WebMercatorProjection();
 
-						// 默认全球经纬度瓦片范围
-            CesiumGeospatial::GlobeRectangle tilingSchemeRectangle = CesiumGeospatial::GeographicProjection::MAXIMUM_GLOBE_RECTANGLE;
-            // CesiumGeospatial::GlobeRectangle tilingSchemeRectangle = CesiumGeospatial::WebMercatorProjection::MAXIMUM_GLOBE_RECTANGLE;
+            // 默认全球经纬度瓦片范围
+            CesiumGeospatial::GlobeRectangle tilingSchemeRectangle =
+                CesiumGeospatial::GeographicProjection::MAXIMUM_GLOBE_RECTANGLE;
+            // CesiumGeospatial::GlobeRectangle tilingSchemeRectangle =
+            // CesiumGeospatial::WebMercatorProjection::MAXIMUM_GLOBE_RECTANGLE;
 
             // 经纬度瓦片根节点瓦片列数为 2; Web 墨卡托的根节点瓦片列数为 1
-						// 默认使用纬度瓦片
+            // 默认使用纬度瓦片
             uint32_t rootTilesX = 2;
 
-						if (options.projection) {
-							projection = options.projection.value();
-							// 需要根据投影方式确定 tilingSchemeRectangle 和 rootTilesX
-							// CesiumGeospatial::Projection 是一个 std::variant，其模板参数类型索引为 GeographicProjection = 0, WebMercatorProjection = 1
-							// 【注意】如果以后 Cesium 修改了此 variant 的参数模板定义，这里也要相应修改！
-							if (projection.index() == 0)
-							{
-								// 地理坐标系
-								tilingSchemeRectangle = CesiumGeospatial::GeographicProjection::MAXIMUM_GLOBE_RECTANGLE;
-								rootTilesX = 2;
-							}
-							else if(projection.index() == 1)
-							{
-								// Web 墨卡托坐标系
-								tilingSchemeRectangle = CesiumGeospatial::WebMercatorProjection::MAXIMUM_GLOBE_RECTANGLE;
-								rootTilesX = 1;
-							}
-						}
+            if (options.projection) {
+              projection = options.projection.value();
+              // 需要根据投影方式确定 tilingSchemeRectangle 和 rootTilesX
+              // CesiumGeospatial::Projection 是一个
+              // std::variant，其模板参数类型索引为 GeographicProjection = 0,
+              // WebMercatorProjection = 1 【注意】如果以后 Cesium 修改了此
+              // variant 的参数模板定义，这里也要相应修改！
+              if (projection.index() == 0) {
+                // 地理坐标系
+                tilingSchemeRectangle = CesiumGeospatial::GeographicProjection::
+                    MAXIMUM_GLOBE_RECTANGLE;
+                rootTilesX = 2;
+              } else if (projection.index() == 1) {
+                // Web 墨卡托坐标系
+                tilingSchemeRectangle = CesiumGeospatial::
+                    WebMercatorProjection::MAXIMUM_GLOBE_RECTANGLE;
+                rootTilesX = 1;
+              }
+            }
 
-            CesiumGeometry::Rectangle coverageRectangle = options.coverageRectangle.value_or(projectRectangleSimple(projection, tilingSchemeRectangle));
+            CesiumGeometry::Rectangle coverageRectangle =
+                options.coverageRectangle.value_or(
+                    projectRectangleSimple(projection, tilingSchemeRectangle));
 
-						CesiumGeometry::QuadtreeTilingScheme tilingScheme = options.tilingScheme.value_or(
-							CesiumGeometry::QuadtreeTilingScheme(projectRectangleSimple(projection, tilingSchemeRectangle),
-                rootTilesX,
-                1));
+            CesiumGeometry::QuadtreeTilingScheme tilingScheme =
+                options.tilingScheme.value_or(
+                    CesiumGeometry::QuadtreeTilingScheme(
+                        projectRectangleSimple(
+                            projection,
+                            tilingSchemeRectangle),
+                        rootTilesX,
+                        1));
 
             // std::string url = this->_url;
-            //std::vector<CesiumAsync::IAssetAccessor::THeader> headers =
+            // std::vector<CesiumAsync::IAssetAccessor::THeader> headers =
             //    this->_headers;
-            // std::string fileExtension = options.fileExtension.value_or("jpg");
-						std::string fileEextension = "";
+            // std::string fileExtension =
+            // options.fileExtension.value_or("jpg");
+            std::string fileEextension = "";
             uint32_t tileWidth = options.tileWidth.value_or(256);
             uint32_t tileHeight = options.tileHeight.value_or(256);
             uint32_t minimumLevel = options.minimumLevel.value_or(0);
             uint32_t maximumLevel = options.maximumLevel.value_or(25);
 
-								// 未提供的请求参数就使用默认
-						std::string version = options.version.value_or("1.0.0");
-						std::string style = options.style.value_or("default");
-						std::string format = options.format.value_or("tiles");
+            // 未提供的请求参数就使用默认
+            std::string version = options.version.value_or("1.0.0");
+            std::string style = options.style.value_or("default");
+            std::string format = options.format.value_or("tiles");
 
-						if (version.empty()) version = "1.0.0";
-						if (style.empty()) style = "default";
-						if (format.empty()) format = "tiles";
+            if (version.empty())
+              version = "1.0.0";
+            if (style.empty())
+              style = "default";
+            if (format.empty())
+              format = "tiles";
 
             return new WebMapTileServiceTileProvider(
                 pOwner,
@@ -267,14 +283,14 @@ Future<RasterOverlay::CreateTileProviderResult>
                 tilingScheme,
                 coverageRectangle,
                 url,
-								version,
+                version,
                 headers,
-								options.layer.value_or("img"),
+                options.layer.value_or("img"),
                 style,
-								options.tileMatrixSet.value_or("c"),
-								format,
-								options.tokenName.value_or(""),
-								options.tokenValue.value_or(""),
+                options.tileMatrixSet.value_or("c"),
+                format,
+                options.tokenName.value_or(""),
+                options.tokenValue.value_or(""),
                 tileWidth,
                 tileHeight,
                 minimumLevel,

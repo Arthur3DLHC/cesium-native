@@ -20,46 +20,46 @@ class CreditSystem;
  * @brief Options for web map tile service accesses.
  */
 struct WebMapTileServiceRasterOverlayOptions {
-
   /**
    * @brief A credit for the data source, which is displayed on the canvas.
    */
   std::optional<std::string> credit;
 
-	/*
-	 * @brief The WMTS tile layer
-	 */
-	std::optional<std::string> layer;
+  /*
+   * @brief The WMTS tile layer
+   */
+  std::optional<std::string> layer;
 
-	/*
-	 * @brief The WMTS service verion, default 1.0.0
-	 */
-	std::optional<std::string> version;
+  /*
+   * @brief The WMTS service verion, default 1.0.0
+   */
+  std::optional<std::string> version;
 
-	/*
-	 * @brief The WMTS tile layer style
-	 */
-	std::optional<std::string> style;
+  /*
+   * @brief The WMTS tile layer style
+   */
+  std::optional<std::string> style;
 
-	/*
-	 * @brief The tile matrix set
-	 */
-	std::optional<std::string> tileMatrixSet;
+  /*
+   * @brief The tile matrix set
+   */
+  std::optional<std::string> tileMatrixSet;
 
-	/*
-	 * @brief The tile format
-	 */
-	std::optional<std::string> format;
+  /*
+   * @brief The tile format
+   */
+  std::optional<std::string> format;
 
-	/*
-	 * @brief The access token name, for example, tk=abcd, the token name is 'tk'
-	 */
-	std::optional<std::string> tokenName;
+  /*
+   * @brief The access token name, for example, tk=abcd, the token name is 'tk'
+   */
+  std::optional<std::string> tokenName;
 
-	/*
-	 * @brief The access token variable, for example, tk=abcd, the token value is 'abcd'
-	 */
-	std::optional<std::string> tokenValue;
+  /*
+   * @brief The access token variable, for example, tk=abcd, the token value is
+   * 'abcd'
+   */
+  std::optional<std::string> tokenValue;
 
   /**
    * @brief The minimum level-of-detail supported by the imagery provider.
@@ -118,6 +118,13 @@ struct WebMapTileServiceRasterOverlayOptions {
    *
    */
   std::optional<bool> flipY;
+
+  // TODO: flipX？
+
+  /**
+   * @brief Subdomains
+   */
+  std::vector<std::string> subdomains;
 };
 
 /**
@@ -126,6 +133,10 @@ struct WebMapTileServiceRasterOverlayOptions {
 class CESIUM3DTILESSELECTION_API WebMapTileServiceRasterOverlay final
     : public RasterOverlay {
 public:
+  // TODO: 参考
+  // https://cesium.com/learn/cesiumjs/ref-doc/WebMapTileServiceImageryProvider.html
+  // 改用 urlTemplate ？ （如果没有指定，则使用默认的 template？）
+
   /**
    * @brief Creates a new instance.
    *
@@ -144,15 +155,15 @@ public:
       const RasterOverlayOptions& overlayOptions = {});
   virtual ~WebMapTileServiceRasterOverlay() override;
 
-  virtual CesiumAsync::Future<CreateTileProviderResult>
-  createTileProvider(
+  virtual CesiumAsync::Future<CreateTileProviderResult> createTileProvider(
       const CesiumAsync::AsyncSystem& asyncSystem,
       const std::shared_ptr<CesiumAsync::IAssetAccessor>& pAssetAccessor,
       const std::shared_ptr<CreditSystem>& pCreditSystem,
       const std::shared_ptr<IPrepareRendererResources>&
           pPrepareRendererResources,
       const std::shared_ptr<spdlog::logger>& pLogger,
-      CesiumUtility::IntrusivePointer<const RasterOverlay> pOwner) const override;
+      CesiumUtility::IntrusivePointer<const RasterOverlay> pOwner)
+      const override;
 
 private:
   std::string _url;
