@@ -46,7 +46,8 @@ public:
       uint32_t width,
       uint32_t height,
       uint32_t minimumLevel,
-      uint32_t maximumLevel)
+      uint32_t maximumLevel,
+      const std::vector<std::string>& subdomains)
       : QuadtreeRasterOverlayTileProvider(
             owner,
             asyncSystem,
@@ -69,7 +70,8 @@ public:
         _tileMatrixSet(tileMatrixSet),
         _format(format),
         _tokenName(tokenName),
-        _tokenValue(tokenValue) {}
+        _tokenValue(tokenValue),
+        _subdomains(subdomains) {}
 
   virtual ~WebMapTileServiceTileProvider() {}
 
@@ -86,6 +88,25 @@ protected:
     // WMTS 需要将 y 轴取反
     uint32_t y = (1 << tileID.level) - 1 - tileID.y;
 
+    // TODO: 改为将 url 字符串视为模板？与 Cesium JS 保持一致
+    // 需要根据 url 判断是 KVP 方式调用还是 REST 方式调用。参见 Source\Scene\WebMapTileServiceImageryProvider.js _useKvp 属性的赋值代码
+    // TODO: 支持 subdomains
+    std::string url = CesiumUtility::Uri::substituteTemplateParameters(
+        _url,
+        [this, &tileID](const std::string& key) {
+          if (key == "s") {
+            // 如果指定了{s}模板参数，则 subdomains 数组中必须有元素
+            assert(_subdomains.size() > 0);
+            const size_t subdomainIndex =
+                (tileID.level + tileID.x + tileID.y) % _subdomains.size();
+            return _subdomains[subdomainIndex];
+          }
+          else if (key == "") {
+
+          }
+          return key;
+        });
+
     // 拼接参数
 
     std::string requestParams =
@@ -100,8 +121,6 @@ protected:
       requestParams = requestParams + "&" + _tokenName + "=" + _tokenValue;
     }
 
-    // TODO: 改为将 url 字符串视为模板？与 Cesium JS 保持一致
-    // TODO: 支持 subdomains
 
     std::string url =
         CesiumUtility::Uri::resolve(this->_url, requestParams, true);
@@ -144,6 +163,8 @@ private:
   std::string _format;
   std::string _tokenName;
   std::string _tokenValue;
+
+  std::vector<std::string> _subdomains;
 };
 
 WebMapTileServiceRasterOverlay::WebMapTileServiceRasterOverlay(
@@ -294,7 +315,8 @@ Future<RasterOverlay::CreateTileProviderResult>
                 tileWidth,
                 tileHeight,
                 minimumLevel,
-                maximumLevel);
+                maximumLevel,
+                options.subdomains);
           });
 }
 
