@@ -62,7 +62,7 @@ struct WebMapTileServiceRasterOverlayOptions {
   std::optional<std::string> tokenValue;
 
   	/*
-   * @brief The level bias. The {z} in url template will be replaced by the tile original level + levelBias
+   * @brief The level bias. The {TileMatrix} in url template will be replaced by the tile original level + levelBias
    */
   std::optional<int32_t> levelBias;
 

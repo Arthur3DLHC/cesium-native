@@ -332,6 +332,8 @@ Future<RasterOverlay::CreateTileProviderResult>
               // std::variant，其模板参数类型索引为 GeographicProjection = 0,
               // WebMercatorProjection = 1 【注意】如果以后 Cesium 修改了此
               // variant 的参数模板定义，这里也要相应修改！
+
+              // 经过与 Cesium JS Source\Core\GeographicTilingScheme.js 和 Source\Core\WebMercatorTilingScheme.js 的比对，确定了根节点的瓦片行列数。
               if (projection.index() == 0) {
                 // 地理坐标系
                 tilingSchemeRectangle = CesiumGeospatial::GeographicProjection::
