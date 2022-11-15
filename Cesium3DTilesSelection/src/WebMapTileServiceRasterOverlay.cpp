@@ -47,6 +47,10 @@ public:
       uint32_t height,
       uint32_t minimumLevel,
       uint32_t maximumLevel,
+      int levelBias,
+      bool reverseX,
+      bool reverseY,
+      const std::vector<std::string>& tileMatrixLabels,
       const std::vector<std::string>& subdomains)
       : QuadtreeRasterOverlayTileProvider(
             owner,
@@ -71,7 +75,22 @@ public:
         _format(format),
         _tokenName(tokenName),
         _tokenValue(tokenValue),
-        _subdomains(subdomains) {}
+        _subdomains(subdomains),
+        _tileMatrixLabels(tileMatrixLabels),
+        _levelBias(levelBias),
+        _reverseX(reverseX),
+        _reverseY(reverseY) {
+    // 根据 url 判断是 KVP 还是 RESTful 风格调用
+    // 参考 Cesium JS, Source\Scene\WebMapTileServiceImageryProvider.js 判断逻辑
+    // 如果 url 中没有出现左大括号，或只有一个 {s} 大括号（为子域模板参数），则认为是 KVP 风格；否则为 REST 风格。
+    auto bracketCount = std::count(_url.begin(), _url.end(), '{');
+    if (bracketCount == 0 ||
+        (bracketCount == 1 && _url.find("{s}") != std::string::npos)) {
+      _useKVP = true;
+    } else {
+      _useKVP = false;
+    }
+  }
 
   virtual ~WebMapTileServiceTileProvider() {}
 
@@ -79,51 +98,117 @@ protected:
   virtual CesiumAsync::Future<LoadedRasterOverlayImage> loadQuadtreeTileImage(
       const CesiumGeometry::QuadtreeTileID& tileID) const override {
 
-    // 经纬度投影下的 tileID 需要特殊处理
-    uint32_t level = tileID.level;
-    if (this->getProjection().index() == 0) {
-      level++;
+    LoadTileImageFromUrlOptions options;
+    options.rectangle = this->getTilingScheme().tileToRectangle(tileID);
+    options.moreDetailAvailable = tileID.level < this->getMaximumLevel();
+
+    // 如果没有提供足够的 tile matrix label，返回加载失败。
+    if (_tileMatrixLabels.size() <= tileID.level) {
+      return this->getAsyncSystem()
+          .createResolvedFuture<LoadedRasterOverlayImage>(
+              {std::nullopt,
+               options.rectangle,
+               {},
+               {"Failed to load image from TMS."},
+               {},
+               options.moreDetailAvailable});
     }
+
+    // 经纬度投影下的 tileID 需要特殊处理
+    // fix me: 查阅一下 CesiumJS 的 WMTS imagery provider 是怎么处理的
+    uint32_t level = tileID.level + _levelBias;
+    //if (this->getProjection().index() == 0) {
+    //  level++;
+    //}
 
     // WMTS 需要将 y 轴取反
-    uint32_t y = (1 << tileID.level) - 1 - tileID.y;
+    // fix me: 查阅一下 CesiumJS 的 WMTS imagery provider 是怎么处理的
+    // uint32_t y = (1 << tileID.level) - 1 - tileID.y;
+    // uint32_t y = getTilingScheme().getNumberOfYTilesAtLevel(tileID.level) - tileID.y - 1;
+    uint32_t x = tileID.x;
+    uint32_t y = tileID.y;
 
-    // TODO: 改为将 url 字符串视为模板？与 Cesium JS 保持一致
-    // 需要根据 url 判断是 KVP 方式调用还是 REST 方式调用。参见 Source\Scene\WebMapTileServiceImageryProvider.js _useKvp 属性的赋值代码
-    // TODO: 支持 subdomains
-    std::string url = CesiumUtility::Uri::substituteTemplateParameters(
-        _url,
-        [this, &tileID](const std::string& key) {
-          if (key == "s") {
-            // 如果指定了{s}模板参数，则 subdomains 数组中必须有元素
-            assert(_subdomains.size() > 0);
-            const size_t subdomainIndex =
-                (tileID.level + tileID.x + tileID.y) % _subdomains.size();
-            return _subdomains[subdomainIndex];
-          }
-          else if (key == "") {
-
-          }
-          return key;
-        });
-
-    // 拼接参数
-
-    std::string requestParams =
-        "?service=wmts&request=gettile&version=" + _version +
-        "&layer=" + _layer + "&style=" + _style +
-        "&tilematrixset=" + _tileMatrixSet + "&format=" + _format +
-        "&tilematrix=" + std::to_string(level) +
-        "&tilerow=" + std::to_string(y) +
-        "&tilecol=" + std::to_string(tileID.x);
-
-    if (!_tokenName.empty() && !_tokenValue.empty()) {
-      requestParams = requestParams + "&" + _tokenName + "=" + _tokenValue;
+    if (_reverseX) {
+      // fix me: 这里应该使用原始 level，还是加了 bias 之后的 level？需要调试检验
+      x = getTilingScheme().getNumberOfXTilesAtLevel(tileID.level) - x - 1;
+    }
+    if (_reverseY) {
+      // fix me: 这里应该使用原始 level，还是加了 bias 之后的
+      // level？需要调试检验
+      y = getTilingScheme().getNumberOfYTilesAtLevel(tileID.level) - y - 1;
     }
 
 
-    std::string url =
-        CesiumUtility::Uri::resolve(this->_url, requestParams, true);
+    std::string url;
+    if (_useKVP) {
+      // 也需要替换 {s} 模板参数
+      std::string baseUrl = CesiumUtility::Uri::substituteTemplateParameters(
+          _url,
+          [this, &tileID](const std::string& key) {
+            if (key == "s") {
+              // 如果指定了{s}模板参数，则 subdomains 数组中必须有元素
+              assert(_subdomains.size() > 0);
+              const size_t subdomainIndex =
+                  (tileID.level + tileID.x + tileID.y) % _subdomains.size();
+              return _subdomains[subdomainIndex];
+            } else {
+              return key;
+            }
+          });
+
+      // KVP 风格调用，拼接参数键值对列表
+      std::string requestParams =
+          "?service=wmts&request=gettile&version=" + _version +
+          "&layer=" + _layer + "&style=" + _style +
+          "&tilematrixset=" + _tileMatrixSet + "&format=" + _format +
+          "&tilematrix=" +
+          (_tileMatrixLabels.size() > 0 ? _tileMatrixLabels[level]
+                                        : std::to_string(level)) +
+          "&tilerow=" + std::to_string(y) +
+          "&tilecol=" + std::to_string(x);
+
+      if (!_tokenName.empty() && !_tokenValue.empty()) {
+        requestParams = requestParams + "&" + _tokenName + "=" + _tokenValue;
+      }
+
+      url = CesiumUtility::Uri::resolve(baseUrl, requestParams, true);
+    } else {
+      // REST 风格调用，替换字符串模板参数
+      url = CesiumUtility::Uri::substituteTemplateParameters(
+          _url,
+          [this, &tileID, level, x, y](const std::string& key) {
+            if (key == "s") {
+              // 如果指定了{s}模板参数，则 subdomains 数组中必须有元素
+              assert(_subdomains.size() > 0);
+              const size_t subdomainIndex =
+                  (tileID.level + tileID.x + tileID.y) % _subdomains.size();
+              return _subdomains[subdomainIndex];
+            } /* else if (key == "Layer" || key == "layer") {
+              // REST 风格没有必要加 {layer} 模板参数，因为可以直接把它的值写在模板字符串里
+              return _layer;
+            } */
+            else if (key == "style") {
+              return _style;
+            } /* else if (key == "Format" || key == "format") {
+              // REST 风格没有必要加 {format} 模板参数，因为可以直接把它的值写在模板字符串里
+              return _format;
+            }
+            else if (key == "TileMatrixSet" || key == "tilematrixset") {
+              // REST 风格没有必要加 {tilematrixset} 模板参数，因为可以直接把它的值写在模板字符串里
+              return _tileMatrixSet;
+            } */
+            else if (key == "TileMatrix" || key == "tilematrix") {
+              return _tileMatrixLabels.size() > 0 ? _tileMatrixLabels[level]
+                                                  : std::to_string(level);
+            } else if (key == "TileRow" || key == "tilerow") {
+              return std::to_string(y);
+            } else if (key == "TileCol" || key == "tilecol") {
+              return std::to_string(x);
+            } else {
+              return key;
+            }
+          });
+    }
 
 		// 调试
 		//std::string tk = "9084ac98a18afab0293b5ce547b0fcac";
@@ -144,12 +229,10 @@ protected:
 
     // std::cout << url << std::endl;
     // ::OuputDebugString(url.c_str());
-    printf(url.c_str());
-    printf("\n");
+    //printf(url.c_str());
+    //printf("\n");
 
-    LoadTileImageFromUrlOptions options;
-    options.rectangle = this->getTilingScheme().tileToRectangle(tileID);
-    options.moreDetailAvailable = tileID.level < this->getMaximumLevel();
+
     return this->loadTileImageFromUrl(url, this->_headers, std::move(options));
   }
 
@@ -164,7 +247,12 @@ private:
   std::string _tokenName;
   std::string _tokenValue;
 
+  bool _reverseX = false;
+  bool _reverseY = false;
+  int _levelBias = 0;
+  bool _useKVP = false;
   std::vector<std::string> _subdomains;
+  std::vector<std::string> _tileMatrixLabels;
 };
 
 WebMapTileServiceRasterOverlay::WebMapTileServiceRasterOverlay(
@@ -316,6 +404,10 @@ Future<RasterOverlay::CreateTileProviderResult>
                 tileHeight,
                 minimumLevel,
                 maximumLevel,
+                options.levelBias.value_or(0),
+                options.reverseX.value_or(false),
+                options.reverseY.value_or(false),
+                options.tileMatrixLabels,
                 options.subdomains);
           });
 }

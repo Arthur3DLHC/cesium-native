@@ -61,6 +61,11 @@ struct WebMapTileServiceRasterOverlayOptions {
    */
   std::optional<std::string> tokenValue;
 
+  	/*
+   * @brief The level bias. The {z} in url template will be replaced by the tile original level + levelBias
+   */
+  std::optional<int32_t> levelBias;
+
   /**
    * @brief The minimum level-of-detail supported by the imagery provider.
    *
@@ -114,12 +119,28 @@ struct WebMapTileServiceRasterOverlayOptions {
   std::optional<uint32_t> tileHeight;
 
   /**
+   * @brief An otion to flip the x values of a tile map resource.
+   *
+   * 由于 WMTS KVP 风格调用时无法使用 {reverseX} 模板参数，所以单加一个标志
+   * because WMTS KVP Style call can not use {reverseX} template param, so add this flag.
+   */
+  std::optional<bool> reverseX;
+
+  /**
    * @brief An otion to flip the y values of a tile map resource.
    *
+   * 由于 WMTS KVP 风格调用时无法使用 {reverseY} 模板参数，所以单加一个标志
+   * because WMTS KVP Style call can not use {reverseY} template param, so add this flag.
    */
-  std::optional<bool> flipY;
+  std::optional<bool> reverseY;
 
-  // TODO: flipX？
+
+  /**
+  * @brief A list of identifiers in the TileMatrix to use for WMTS requests, one per TileMatrix level.
+  *
+  * If empty, the level number will be used.
+  */
+  std::vector<std::string> tileMatrixLabels;
 
   /**
    * @brief Subdomains
