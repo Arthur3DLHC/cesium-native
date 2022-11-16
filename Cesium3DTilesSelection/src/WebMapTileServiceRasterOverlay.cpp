@@ -102,8 +102,8 @@ protected:
     options.rectangle = this->getTilingScheme().tileToRectangle(tileID);
     options.moreDetailAvailable = tileID.level < this->getMaximumLevel();
 
-    // 如果没有提供足够的 tile matrix label，返回加载失败。
-    if (_tileMatrixLabels.size() <= tileID.level) {
+    // 如果使用了 tile matrix label 但是没有提供足够的条目，返回加载失败。
+    if (_tileMatrixLabels.size() > 0 && _tileMatrixLabels.size() <= tileID.level) {
       return this->getAsyncSystem()
           .createResolvedFuture<LoadedRasterOverlayImage>(
               {std::nullopt,
@@ -277,16 +277,127 @@ Future<RasterOverlay::CreateTileProviderResult>
     const std::shared_ptr<spdlog::logger>& pLogger,
     CesiumUtility::IntrusivePointer<const RasterOverlay> pOwner) const {
 
+    const std::optional<Credit> credit =
+      this->_options.credit ? std::make_optional(pCreditSystem->createCredit(
+                                  this->_options.credit.value()))
+                            : std::nullopt;
+
+  pOwner = pOwner ? pOwner : this;
+
+  // 调试：尝试不 Get Capability，直接返回一个 Resolved 对象
+  // 默认使用经纬度投影？
+  CesiumGeospatial::Projection projection =
+      CesiumGeospatial::GeographicProjection();
+  // CesiumGeospatial::Projection projection =
+  // CesiumGeospatial::WebMercatorProjection();
+
+  // 默认全球经纬度瓦片范围
+  CesiumGeospatial::GlobeRectangle tilingSchemeRectangle =
+      CesiumGeospatial::GeographicProjection::MAXIMUM_GLOBE_RECTANGLE;
+  // CesiumGeospatial::GlobeRectangle tilingSchemeRectangle =
+  // CesiumGeospatial::WebMercatorProjection::MAXIMUM_GLOBE_RECTANGLE;
+
+  // 经纬度瓦片根节点瓦片列数为 2; Web 墨卡托的根节点瓦片列数为 1
+  // 默认使用纬度瓦片
+  uint32_t rootTilesX = 2;
+
+  if (_options.projection) {
+    projection = _options.projection.value();
+    // 需要根据投影方式确定 tilingSchemeRectangle 和 rootTilesX
+    // CesiumGeospatial::Projection 是一个
+    // std::variant，其模板参数类型索引为 GeographicProjection = 0,
+    // WebMercatorProjection = 1 【注意】如果以后 Cesium 修改了此
+    // variant 的参数模板定义，这里也要相应修改！
+
+    // 经过与 Cesium JS Source\Core\GeographicTilingScheme.js 和
+    // Source\Core\WebMercatorTilingScheme.js
+    // 的比对，确定了根节点的瓦片行列数。
+    if (projection.index() == 0) {
+      // 地理坐标系
+      tilingSchemeRectangle =
+          CesiumGeospatial::GeographicProjection::MAXIMUM_GLOBE_RECTANGLE;
+      rootTilesX = 2;
+    } else if (projection.index() == 1) {
+      // Web 墨卡托坐标系
+      tilingSchemeRectangle =
+          CesiumGeospatial::WebMercatorProjection::MAXIMUM_GLOBE_RECTANGLE;
+      rootTilesX = 1;
+    }
+  }
+
+  CesiumGeometry::Rectangle coverageRectangle =
+      _options.coverageRectangle.value_or(
+          projectRectangleSimple(projection, tilingSchemeRectangle));
+
+  CesiumGeometry::QuadtreeTilingScheme tilingScheme =
+      _options.tilingScheme.value_or(CesiumGeometry::QuadtreeTilingScheme(
+          projectRectangleSimple(projection, tilingSchemeRectangle),
+          rootTilesX,
+          1));
+
+  // std::string url = this->_url;
+  // std::vector<CesiumAsync::IAssetAccessor::THeader> headers =
+  //    this->_headers;
+  // std::string fileExtension =
+  // options.fileExtension.value_or("jpg");
+  std::string fileEextension = "";
+  uint32_t tileWidth = _options.tileWidth.value_or(256);
+  uint32_t tileHeight = _options.tileHeight.value_or(256);
+  uint32_t minimumLevel = _options.minimumLevel.value_or(0);
+  uint32_t maximumLevel = _options.maximumLevel.value_or(25);
+
+  // 未提供的请求参数就使用默认
+  std::string version = _options.version.value_or("1.0.0");
+  std::string style = _options.style.value_or("default");
+  std::string format = _options.format.value_or("tiles");
+
+  if (version.empty())
+    version = "1.0.0";
+  if (style.empty())
+    style = "default";
+  if (format.empty())
+    format = "tiles";
+
+  return asyncSystem
+      .createResolvedFuture<RasterOverlay::CreateTileProviderResult>(
+          IntrusivePointer<WebMapTileServiceTileProvider>(
+              new WebMapTileServiceTileProvider(
+      pOwner,
+      asyncSystem,
+      pAssetAccessor,
+      credit,
+      pPrepareRendererResources,
+      pLogger,
+      projection,
+      tilingScheme,
+      coverageRectangle,
+      _url,
+      version,
+      _headers,
+      _options.layer.value_or("img"),
+      style,
+                  _options.tileMatrixSet.value_or("c"),
+      format,
+                  _options.tokenName.value_or(""),
+                  _options.tokenValue.value_or(""),
+      tileWidth,
+      tileHeight,
+      minimumLevel,
+      maximumLevel,
+      _options.levelBias.value_or(0),
+      _options.reverseX.value_or(false),
+      _options.reverseY.value_or(false),
+      _options.tileMatrixLabels,
+      _options.subdomains)));
+
+
+  /*
+
   // 这里改为获得 WMTS Ability xml 数据
   std::string xmlUrl =
       CesiumUtility::Uri::resolve(this->_url, "?service=wmts&request=GetCapabilities");
 
-  pOwner = pOwner ? pOwner : this;
 
-  const std::optional<Credit> credit =
-      this->_options.credit ? std::make_optional(pCreditSystem->createCredit(
-                                  this->_options.credit.value()))
-                            : std::nullopt;
 
   return pAssetAccessor->get(asyncSystem, xmlUrl, this->_headers)
       .thenInWorkerThread(
@@ -299,14 +410,14 @@ Future<RasterOverlay::CreateTileProviderResult>
            options = this->_options,
            url = this->_url,
            headers =
-               this->_headers](const std::shared_ptr<IAssetRequest>& pRequest)
+               this->_headers](std::shared_ptr<IAssetRequest>& pRequest)
               -> CreateTileProviderResult {
             const IAssetResponse* pResponse = pRequest->response();
             if (!pResponse) {
-              return nonstd::make_unexpected(RasterOverlayLoadFailureDetails{
-                  RasterOverlayLoadType::TileProvider,
-                  std::move(pRequest),
-                  "No response received from Tile Map Service."});
+              //return nonstd::make_unexpected(RasterOverlayLoadFailureDetails{
+              //    RasterOverlayLoadType::TileProvider,
+              //    std::move(pRequest),
+              //    "No response received when getting WMTS capabilities."});
             }
 
             // 默认使用经纬度投影？
@@ -333,7 +444,9 @@ Future<RasterOverlay::CreateTileProviderResult>
               // WebMercatorProjection = 1 【注意】如果以后 Cesium 修改了此
               // variant 的参数模板定义，这里也要相应修改！
 
-              // 经过与 Cesium JS Source\Core\GeographicTilingScheme.js 和 Source\Core\WebMercatorTilingScheme.js 的比对，确定了根节点的瓦片行列数。
+              // 经过与 Cesium JS Source\Core\GeographicTilingScheme.js 和
+              // Source\Core\WebMercatorTilingScheme.js
+              // 的比对，确定了根节点的瓦片行列数。
               if (projection.index() == 0) {
                 // 地理坐标系
                 tilingSchemeRectangle = CesiumGeospatial::GeographicProjection::
@@ -412,6 +525,7 @@ Future<RasterOverlay::CreateTileProviderResult>
                 options.tileMatrixLabels,
                 options.subdomains);
           });
+   */
 }
 
 } // namespace Cesium3DTilesSelection
