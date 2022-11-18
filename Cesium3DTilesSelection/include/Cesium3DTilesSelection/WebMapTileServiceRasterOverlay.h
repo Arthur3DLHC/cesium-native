@@ -118,13 +118,15 @@ struct WebMapTileServiceRasterOverlayOptions {
    */
   std::optional<uint32_t> tileHeight;
 
+  // LHC 20221118 以下两个参数废弃。因为 WMTS 有可遵循的规范
+
   /**
    * @brief An otion to flip the x values of a tile map resource.
    *
    * 由于 WMTS KVP 风格调用时无法使用 {reverseX} 模板参数，所以单加一个标志
    * because WMTS KVP Style call can not use {reverseX} template param, so add this flag.
    */
-  std::optional<bool> reverseX;
+  // std::optional<bool> reverseX;
 
   /**
    * @brief An otion to flip the y values of a tile map resource.
@@ -132,7 +134,7 @@ struct WebMapTileServiceRasterOverlayOptions {
    * 由于 WMTS KVP 风格调用时无法使用 {reverseY} 模板参数，所以单加一个标志
    * because WMTS KVP Style call can not use {reverseY} template param, so add this flag.
    */
-  std::optional<bool> reverseY;
+  // std::optional<bool> reverseY;
 
 
   /**

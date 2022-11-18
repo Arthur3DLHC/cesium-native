@@ -48,8 +48,9 @@ public:
       uint32_t minimumLevel,
       uint32_t maximumLevel,
       int levelBias,
-      bool reverseX,
-      bool reverseY,
+    // 这两个参数废弃，因为 WMTS 有固定的规范
+      // bool reverseX,
+      // bool reverseY,
       const std::vector<std::string>& tileMatrixLabels,
       const std::vector<std::string>& subdomains)
       : QuadtreeRasterOverlayTileProvider(
@@ -77,9 +78,10 @@ public:
         _tokenValue(tokenValue),
         _subdomains(subdomains),
         _tileMatrixLabels(tileMatrixLabels),
-        _levelBias(levelBias),
-        _reverseX(reverseX),
-        _reverseY(reverseY) {
+        _levelBias(levelBias)
+        // _reverseX(reverseX),
+        // _reverseY(reverseY)
+        {
     // 根据 url 判断是 KVP 还是 RESTful 风格调用
     // 参考 Cesium JS, Source\Scene\WebMapTileServiceImageryProvider.js 判断逻辑
     // 如果 url 中没有出现左大括号，或只有一个 {s} 大括号（为子域模板参数），则认为是 KVP 风格；否则为 REST 风格。
@@ -128,15 +130,17 @@ protected:
     uint32_t x = tileID.x;
     uint32_t y = tileID.y;
 
-    if (_reverseX) {
-      // fix me: 这里应该使用原始 level，还是加了 bias 之后的 level？需要调试检验
-      x = getTilingScheme().getNumberOfXTilesAtLevel(tileID.level) - x - 1;
-    }
-    if (_reverseY) {
+    //if (_reverseX) {
+    //  // fix me: 这里应该使用原始 level，还是加了 bias 之后的 level？需要调试检验
+    //  x = getTilingScheme().getNumberOfXTilesAtLevel(tileID.level) - x - 1;
+    //}
+    // if (_reverseY) {
       // fix me: 这里应该使用原始 level，还是加了 bias 之后的
       // level？需要调试检验
+
+      // 根据 WMTS 规范，其 y 坐标与 TMS 和 Cesium 的默认方向相反，所以需要取逆
       y = getTilingScheme().getNumberOfYTilesAtLevel(tileID.level) - y - 1;
-    }
+    // }
 
 
     std::string url;
@@ -247,8 +251,10 @@ private:
   std::string _tokenName;
   std::string _tokenValue;
 
-  bool _reverseX = false;
-  bool _reverseY = false;
+
+  // 这两个参数废弃，因为 WMTS 有固定的规范
+  // bool _reverseX = false;
+  // bool _reverseY = false;
   int _levelBias = 0;
   bool _useKVP = false;
   std::vector<std::string> _subdomains;
@@ -362,33 +368,33 @@ Future<RasterOverlay::CreateTileProviderResult>
       .createResolvedFuture<RasterOverlay::CreateTileProviderResult>(
           IntrusivePointer<WebMapTileServiceTileProvider>(
               new WebMapTileServiceTileProvider(
-      pOwner,
-      asyncSystem,
-      pAssetAccessor,
-      credit,
-      pPrepareRendererResources,
-      pLogger,
-      projection,
-      tilingScheme,
-      coverageRectangle,
-      _url,
-      version,
-      _headers,
-      _options.layer.value_or("img"),
-      style,
+                  pOwner,
+                  asyncSystem,
+                  pAssetAccessor,
+                  credit,
+                  pPrepareRendererResources,
+                  pLogger,
+                  projection,
+                  tilingScheme,
+                  coverageRectangle,
+                  _url,
+                  version,
+                  _headers,
+                  _options.layer.value_or("img"),
+                  style,
                   _options.tileMatrixSet.value_or("c"),
-      format,
+                  format,
                   _options.tokenName.value_or(""),
                   _options.tokenValue.value_or(""),
-      tileWidth,
-      tileHeight,
-      minimumLevel,
-      maximumLevel,
-      _options.levelBias.value_or(0),
-      _options.reverseX.value_or(false),
-      _options.reverseY.value_or(false),
-      _options.tileMatrixLabels,
-      _options.subdomains)));
+                  tileWidth,
+                  tileHeight,
+                  minimumLevel,
+                  maximumLevel,
+                  _options.levelBias.value_or(0),
+                  // _options.reverseX.value_or(false),
+                  // _options.reverseY.value_or(false),
+                  _options.tileMatrixLabels,
+                  _options.subdomains)));
 
 
   /*
