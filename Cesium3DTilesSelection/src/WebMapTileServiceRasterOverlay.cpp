@@ -187,20 +187,18 @@ protected:
               const size_t subdomainIndex =
                   (tileID.level + tileID.x + tileID.y) % _subdomains.size();
               return _subdomains[subdomainIndex];
-            } /* else if (key == "Layer" || key == "layer") {
-              // REST 风格没有必要加 {layer} 模板参数，因为可以直接把它的值写在模板字符串里
+            } else if (key == "Layer" || key == "layer") {
               return _layer;
-            } */
-            else if (key == "style") {
+            } 
+            else if (key == "Style" || key == "style") {
               return _style;
             } /* else if (key == "Format" || key == "format") {
               // REST 风格没有必要加 {format} 模板参数，因为可以直接把它的值写在模板字符串里
               return _format;
-            }
-            else if (key == "TileMatrixSet" || key == "tilematrixset") {
-              // REST 风格没有必要加 {tilematrixset} 模板参数，因为可以直接把它的值写在模板字符串里
-              return _tileMatrixSet;
             } */
+            else if (key == "TileMatrixSet" || key == "tilematrixset") {
+              return _tileMatrixSet;
+            }
             else if (key == "TileMatrix" || key == "tilematrix") {
               return _tileMatrixLabels.size() > 0 ? _tileMatrixLabels[level]
                                                   : std::to_string(level);
